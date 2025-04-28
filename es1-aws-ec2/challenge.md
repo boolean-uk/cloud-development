@@ -134,7 +134,7 @@ tmux attach
 
 ## Extra Steps (Optional)
 
-- Try to build and run a Java/C#/Javascript application.
+- Try to build and run a Java or C# or Javascript application.
 
 ---
 
