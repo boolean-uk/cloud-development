@@ -64,15 +64,17 @@ Create a file named `app.py`:
 
 ```python
 from flask import Flask
+from flask import request
 
 app = Flask(__name__)
 
 @app.route('/')
 def hello_world():
-    return 'Hello from Flask running on EC2!'
+  app.logger.info('Caller ip ---> %s', request.remote_addr)
+  return 'Hello from Flask running on EC2!'
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000)
+  app.run(host='0.0.0.0', port=5000, debug=True)
 ```
 
 ### 5. Run the Flask Application
