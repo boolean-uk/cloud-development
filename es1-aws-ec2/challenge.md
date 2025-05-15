@@ -47,6 +47,7 @@ For Amazon Linux 2:
 ```bash
 sudo yum update -y
 sudo yum install python3 -y
+sudo yum install python3-pip -y
 pip3 install flask
 ```
 
@@ -55,7 +56,7 @@ For Ubuntu:
 ```bash
 sudo apt update
 sudo apt install python3-pip -y
-pip3 install flask
+sudo apt install python3-flask -y
 ```
 
 ### 4. Create a Simple Flask Application
@@ -107,30 +108,40 @@ Hello from Flask running on EC2!
 
 ### 7. Optional: Keep the App Running After Closing SSH
 
-Install `tmux`:
+Use `nohup` to keep the process alive after closing the ssh session:
 
 ```bash
-sudo yum install tmux -y  # Amazon Linux
-# or
-sudo apt install tmux -y  # Ubuntu
+nohup python3 app.py > application.log 2>&1 &
 ```
 
-Start a new tmux session:
+```> application.log 2>&1``` is used to redirect the std output and error to the file ```application.log```
+
+## Kill the server process
+
+To identify and terminate a running `python3` process:
+
+### 1. List the Process IDs (PIDs)
 
 ```bash
-tmux
+pgrep python3
 ```
 
-Run your Flask app inside tmux. To detach and leave it running:
-
-1. Press `Ctrl+B`
-2. Press `D`
-
-To resume the session:
+Example output:
 
 ```bash
-tmux attach
+3387
+3388
 ```
+
+> _Note: The lower PID (`3387`) is typically the **parent process**._
+
+### 2. Kill the Parent Process
+
+```bash
+kill 3387
+```
+
+> 💡 This will also terminate its child process (`3388`), if it's still running.
 
 ---
 
