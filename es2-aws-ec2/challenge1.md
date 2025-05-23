@@ -36,7 +36,7 @@ Deploy a simple web application using an Auto Scaling Group (ASG) with an Elasti
 1. Navigate to **EC2 > Launch Templates**
 2. Create a new template:
     - AMI: `WebServerAMI`
-    - Instance type: `t3.micro`
+    - Instance type: `t2.micro`
     - Security group: allow inbound HTTP (port 80)
     - Key pair: your SSH key
     - Optional: use user data to repeat the setup steps

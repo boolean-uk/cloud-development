@@ -5,52 +5,13 @@
 This guide explains how to deploy a simple Spring Boot Java application to AWS Elastic Beanstalk using a JAR file.
 
 ## Prerequisites
-- Java 17 installed
-- Maven installed
-- AWS CLI configured
-- Elastic Beanstalk CLI (optional but recommended)
+- Java 21 installed
+- Maven installed (optional but recommended)
 
-## 1. Clone or Create Spring Boot App
+## 1. Clone the repository
 ```bash
-git clone https://github.com/your-repo/spring-boot-beanstalk-demo.git
-cd spring-boot-beanstalk-demo
-```
-Or create a new app with the following content.
-
-### `src/main/java/com/example/demo/DemoApplication.java`
-```java
-package com.example.demo;
-
-import org.springframework.boot.SpringApplication;
-import org.springframework.boot.autoconfigure.SpringBootApplication;
-import org.springframework.web.bind.annotation.*;
-
-@SpringBootApplication
-@RestController
-public class DemoApplication {
-    public static void main(String[] args) {
-        SpringApplication.run(DemoApplication.class, args);
-    }
-
-    @GetMapping("/")
-    public String home() {
-        return "Hello from AWS Elastic Beanstalk!";
-    }
-}
-```
-
-### `pom.xml`
-Ensure packaging is `jar` and include the Spring Boot starter dependencies.
-
-```xml
-<packaging>jar</packaging>
-...
-<dependencies>
-    <dependency>
-        <groupId>org.springframework.boot</groupId>
-        <artifactId>spring-boot-starter-web</artifactId>
-    </dependency>
-</dependencies>
+git clone git@github.com:boolean-uk/cloud-development.git
+cd es3-aws-beanstalk/demo
 ```
 
 ## 2. Build Your App
@@ -58,47 +19,24 @@ Ensure packaging is `jar` and include the Spring Boot starter dependencies.
 ./mvnw clean package
 ```
 
-## 3. Create a `Procfile`
-```bash
-echo "web: java -jar target/demo-0.0.1-SNAPSHOT.jar" > Procfile
-```
-
-## 4. Package for Deployment
-Make sure the following are present in your root directory:
-- `Procfile`
-- `target/demo-0.0.1-SNAPSHOT.jar`
-- `pom.xml`
-
-Then zip them:
-```bash
-zip -r demo-app.zip * .[^.]*
-```
-
-## 5. Deploy to Elastic Beanstalk
-### Using AWS Console
+## 3. Deploy to Elastic Beanstalk
 - Go to [AWS Elastic Beanstalk Console](https://console.aws.amazon.com/elasticbeanstalk)
 - Create an application and environment
-- Choose Java platform (e.g., Corretto 17)
-- Upload your `demo-app.zip`
+- Choose Java platform (e.g., Corretto 21)
+- Upload your `target/demo-beanstalk-0.0.1-SNAPSHOT.jar`
 
-### OR Using EB CLI
-```bash
-eb init -p java demo-app
-# Answer configuration prompts
-
-eb create demo-env
-# Deploy your zipped file
-
-eb deploy
-```
+## 4. Add PORT env variable
+- Go to newly created environment **Configuration > Updates, monitoring, and logging**
+- Select Edit
+- Go to the Environment properties section 
+- Add PORT as Name and 8080 as value
+- Click Apply
 
 ## 6. Access the Application
-Navigate to the environment URL provided by AWS (e.g., `http://demo-env.us-east-1.elasticbeanstalk.com`) to see:
+Navigate to the environment URL provided by AWS (e.g., `http://demo-env.eu-west-1.elasticbeanstalk.com`) to see:
 ```
 Hello from AWS Elastic Beanstalk!
 ```
 
 ## 7. Clean Up
-```bash
-eb terminate demo-env
-```
+Terminate the environment
