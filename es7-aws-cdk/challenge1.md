@@ -197,7 +197,7 @@ export class NotesAppCdkStack extends cdk.Stack {
 
 ### 📌 Step 5: Hook Entry File
 
-#### bin/notes-app.ts
+#### bin/notes-app-cdk.ts
 
 ```ts
 #!/usr/bin/env node
