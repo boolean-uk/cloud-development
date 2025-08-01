@@ -34,8 +34,8 @@ CMD ["npm", "start"]
 ### CDK Structure (infra/)
 ```
 infra/
-  ├── bin/cloudcart.ts
-  └── lib/cloudcart-stack.ts
+  ├── bin/infra.ts
+  └── lib/infra-stack.ts
 ```
 
 ### Sample CDK Code (infra/lib/<your-stack-name>.ts)
