@@ -38,7 +38,7 @@ infra/
   └── lib/infra-stack.ts
 ```
 
-### Sample CDK Code (infra/lib/<your-stack-name>.ts)
+### Sample CDK Code (infra/lib/infra.ts)
 ```ts
 import * as cdk from 'aws-cdk-lib';
 import { Construct } from 'constructs';
@@ -67,7 +67,7 @@ Build the product catalog backend, allowing users to list and filter products.
 - Add a Global Secondary Index (GSI) on `category` to support product filtering.
 - Implement API routes in Express for CRUD operations on products.
 
-### CDK Code (infra/lib/<your-stack-name>.ts)
+### CDK Code (infra/lib/infra.ts)
 ```ts
 import * as dynamodb from 'aws-cdk-lib/aws-dynamodb';
 
