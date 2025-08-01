@@ -12,7 +12,10 @@ Set up the base infrastructure and application layout for the project.
 ### Commands
 ```bash
 mkdir cloudcart && cd cloudcart
+mkdir infra
+cd infra
 cdk init app --language=typescript
+cd ..
 npx express-generator --no-view services/api
 cd services/api && npm install && npm install typescript ts-node-dev --save-dev
 ```
@@ -41,7 +44,7 @@ import * as cdk from 'aws-cdk-lib';
 import { Construct } from 'constructs';
 import * as ec2 from 'aws-cdk-lib/aws-ec2';
 
-export class CloudCartStack extends cdk.Stack {
+export class InfraStack extends cdk.Stack {
   constructor(scope: Construct, id: string, props?: cdk.StackProps) {
     super(scope, id, props);
 
@@ -64,7 +67,7 @@ Build the product catalog backend, allowing users to list and filter products.
 - Add a Global Secondary Index (GSI) on `category` to support product filtering.
 - Implement API routes in Express for CRUD operations on products.
 
-### CDK Code
+### CDK Code (infra/lib/<your-stack-name>.ts)
 ```ts
 import * as dynamodb from 'aws-cdk-lib/aws-dynamodb';
 
