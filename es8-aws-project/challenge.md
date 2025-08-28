@@ -5,17 +5,17 @@ It demonstrates how to build a scalable, event-driven backend architecture lever
 
 ## 🔧 Project Features
 
-- Product catalog API with DynamoDB
-- User & order management using Aurora PostgreSQL
-- File uploads to S3 via signed URLs
-- Order queuing with SQS and background processing
-- Notifications via SNS
-- Express app deployment on ECS with Application Load Balancer
-- Auth via API Gateway + Lambda Authorizer
-- Static frontend hosted on S3 with global delivery via CloudFront
-- Secure secret management via Secrets Manager
-- Infrastructure defined using AWS CDK (TypeScript)
-- CI/CD deployment using GitHub Actions (optional)
+- Product Catalog via DynamoDB
+- User & Order management via Aurora PostgreSQL (with RDS Proxy)
+- File Uploads via S3 Signed URLs
+- Cart service (Aurora)
+- Order placement via SQS, background processing with Lambda
+- Notifications via SNS (Email/SMS)
+- API Gateway + Lambda Authorizer for Auth
+- React/Static frontend hosted on S3 + CloudFront
+- Secrets management via Secrets Manager
+- Infrastructure defined with AWS CDK
+- CI/CD (optional) via GitHub Actions
 
 ## 📦 Prerequisites
 
@@ -32,27 +32,24 @@ This project is implemented in 12 phases. Each phase builds part of the system u
 ## 🌐 Architecture Overview
 
 ```
-[React/Static Shopfront] ← CloudFront ← S3
-                       |
-              Route53 + SSL (ACM)
-                       |
-          API Gateway + Lambda Authorizer
-                       |
-                ┌──────────────┐
-                │   ExpressJS  │ (ECS App Service)
-                └──────┬───────┘
-      ┌────────────┐   │   ┌────────────┐
-      │ Aurora SQL │◄──┘   │ DynamoDB   │
-      └────────────┘       └────────────┘
-         ▲                        ▲
-         │                        │
- ┌──────────────┐        ┌──────────────┐
- │ SecretsMgr   │        │  S3 (Media)  │
- └──────────────┘        └──────────────┘
-         │                        ▲
-     ┌────────┐         ┌──────────────┐
-     │ Lambda │◄────SQS─┤ SNS (Notify) │
-     └────────┘         └──────────────┘
+[React/Static Shopfront] ← CloudFront ← S3  
+                      │  
+             Route53 + SSL (ACM)  
+                      │  
+     API Gateway (HTTP API) + Lambda Authorizer  
+          │  
+ ┌────────┴─────────┐  
+ │   Lambda (APIs)  │  ← VPC + RDS Proxy for Aurora  
+ └───┬───────┬──────┘  
+   DynamoDB  │  
+      ▲      │  
+      │    Aurora PostgreSQL  
+      │           ▲  
+  S3 (media)      │  
+      ▲           │  
+  Signed URL  Secrets Manager  
+      │           │  
+   Lambda ◄── SQS (checkout) ──► Lambda worker ──► SNS (email/SMS)
 ```
 
 ---
@@ -63,13 +60,25 @@ This project is implemented in 12 phases. Each phase builds part of the system u
 cloudcart/
 ├── infra/                     # AWS CDK (TypeScript)
 │   ├── lib/                   # Stack definitions
-│   └── bin/                   # Entry point
+│   │   ├── network.ts
+│   │   ├── db.ts
+│   │   ├── dynamo.ts
+│   │   ├── api.ts
+│   │   ├── lambdas.ts
+│   │   └── notifications.ts
+│   └── bin/infra.ts           # CDK App entrypoint
 ├── services/
-│   ├── api/                   # Express.js API (Node + TypeScript)
-│   └── worker/                # SQS Worker (Lambda)
-├── scripts/                   # Seeder scripts, migrations
-├── shared/                    # Common code, models
-└── frontend/                  # (Optional) React frontend
+│   ├── functions/             # Lambda handlers
+│   │   ├── products/
+│   │   ├── users/
+│   │   ├── orders/
+│   │   ├── cart/
+│   │   ├── uploads/
+│   │   ├── auth/
+│   │   └── worker/
+│   └── shared/                # Shared utils/models
+├── scripts/                   # Seeder, migrations
+└── frontend/                  # Optional React frontend
 ```
 
 ---
@@ -80,7 +89,6 @@ cloudcart/
 
 - Init CDK app: `cdk init app --language=typescript`
 - Create VPC, Security Groups, Subnets (reuse in future stacks)
-- Bootstrap Express API with TypeScript and Dockerfile
 
 ### 2. Product Catalog API – DynamoDB (1h)
 

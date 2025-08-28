@@ -15,27 +15,21 @@ mkdir cloudcart && cd cloudcart
 mkdir infra
 cd infra
 cdk init app --language=typescript
-cd ..
-npx express-generator --no-view services/api
-cd services/api && npm install && npm install typescript ts-node-dev --save-dev
 ```
 
-### Dockerfile Example (services/api/Dockerfile)
-```dockerfile
-FROM node:22
-WORKDIR /usr/src/app
-COPY package*.json ./
-RUN npm install
-COPY . .
-EXPOSE 3000
-CMD ["npm", "start"]
-```
 
 ### CDK Structure (infra/)
 ```
-infra/
-  ├── bin/infra.ts
-  └── lib/infra-stack.ts
+cloudcart/
+├── infra/                     # AWS CDK (TypeScript)
+    ├── lib/                   # Stack definitions
+    │   ├── network.ts
+    │   ├── db.ts
+    │   ├── dynamo.ts
+    │   ├── api.ts
+    │   ├── lambdas.ts
+    │   └── notifications.ts
+    └── bin/infra.ts           # CDK App entrypoint
 ```
 
 ### Sample CDK Code (infra/lib/infra.ts)
