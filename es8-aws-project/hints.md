@@ -1,49 +1,63 @@
+
+# CloudCart MVP — Hints & Phases
+
+These hints match the simplified MVP: **API Gateway + Lambda + DynamoDB + SQS** (no Express, no ECS, no Aurora).
+
+---
+
 ## Phase 1: Bootstrap CDK and API Service (0.5h)
 
 ### Objective
-Set up the base infrastructure and application layout for the project.
+Set up the base infrastructure and application layout.
 
 ### Tasks
-- Initialize an AWS CDK app in TypeScript.
-- Scaffold an Express.js application using the Express generator.
-- Set up TypeScript and nodemon for local development.
-- Add a Dockerfile to support ECS deployment later.
+- Initialize an AWS CDK app in **JavaScript**.
+- Create an **HTTP API Gateway** in CDK.
+- Scaffold folder structure for Lambda handlers under `services/`.
+- Add a trivial Lambda + `/hello` route to verify deploy.
 
 ### Commands
 ```bash
 mkdir cloudcart && cd cloudcart
-mkdir infra
-cd infra
-cdk init app --language=typescript
+mkdir infra && cd infra
+cdk init app --language=javascript
 ```
-
 
 ### CDK Structure (infra/)
 ```
 cloudcart/
-├── infra/                     # AWS CDK (TypeScript)
-    ├── lib/                   # Stack definitions
-    │   ├── network.ts
-    │   ├── db.ts
-    │   ├── dynamo.ts
-    │   ├── api.ts
-    │   ├── lambdas.ts
-    │   └── notifications.ts
-    └── bin/infra.ts           # CDK App entrypoint
+├── infra/              # AWS CDK (JavaScript)
+│   ├── bin/            # CDK app entry
+│   └── lib/            # Stack definitions
+├── services/           # Lambda handlers
+│   ├── products/
+│   ├── cart/
+│   └── orders/
+└── scripts/            # Seeder scripts
 ```
 
-### Sample CDK Code (infra/lib/infra.ts)
-```ts
-import * as cdk from 'aws-cdk-lib';
-import { Construct } from 'constructs';
-import * as ec2 from 'aws-cdk-lib/aws-ec2';
+### Sample CDK Code (infra/lib/cloudcart-stack.js)
+```js
+import { Stack } from 'aws-cdk-lib';
+import * as apigwv2 from 'aws-cdk-lib/aws-apigatewayv2';
+import * as apigwInt from 'aws-cdk-lib/aws-apigatewayv2-integrations';
+import * as lambda from 'aws-cdk-lib/aws-lambda';
+import * as node from 'aws-cdk-lib/aws-lambda-nodejs';
 
-export class InfraStack extends cdk.Stack {
-  constructor(scope: Construct, id: string, props?: cdk.StackProps) {
+export class CloudCartStack extends Stack {
+  constructor(scope, id, props) {
     super(scope, id, props);
 
-    const vpc = new ec2.Vpc(this, 'CloudCartVPC', {
-      maxAzs: 2
+    const helloFn = new node.NodejsFunction(this, 'HelloFn', {
+      entry: '../services/hello.js',
+      runtime: lambda.Runtime.NODEJS_22_X
+    });
+
+    const httpApi = new apigwv2.HttpApi(this, 'HttpApi');
+    httpApi.addRoutes({
+      path: '/hello',
+      methods: [apigwv2.HttpMethod.GET],
+      integration: new apigwInt.HttpLambdaIntegration('HelloIntegration', helloFn),
     });
   }
 }
@@ -54,360 +68,167 @@ export class InfraStack extends cdk.Stack {
 ## Phase 2: Product Catalog API – DynamoDB (1h)
 
 ### Objective
-Build the product catalog backend, allowing users to list and filter products.
+Implement the product catalog with category filtering.
 
 ### Tasks
-- Create a DynamoDB table named `Products` with `productId` as the partition key.
-- Add a Global Secondary Index (GSI) on `category` to support product filtering.
-- Implement API routes in Express for CRUD operations on products.
+- Create DynamoDB table `Products` with `id` as the partition key.
+- Add a Global Secondary Index (GSI) on `category`.
+- Create 3 Lambdas:
+    - `GET /products` → list all
+    - `GET /products/{id}` → fetch by ID
+    - `GET /categories/{name}` → query by category (via GSI)
 
-### CDK Code (infra/lib/infra.ts)
-```ts
+### CDK Code
+```js
 import * as dynamodb from 'aws-cdk-lib/aws-dynamodb';
 
-const productTable = new dynamodb.Table(this, 'ProductTable', {
-  partitionKey: { name: 'productId', type: dynamodb.AttributeType.STRING },
+const products = new dynamodb.Table(this, 'ProductsTable', {
+  partitionKey: { name: 'id', type: dynamodb.AttributeType.STRING },
   billingMode: dynamodb.BillingMode.PAY_PER_REQUEST
 });
 
-productTable.addGlobalSecondaryIndex({
-  indexName: 'CategoryIndex',
-  partitionKey: { name: 'category', type: dynamodb.AttributeType.STRING },
-  projectionType: dynamodb.ProjectionType.ALL
+products.addGlobalSecondaryIndex({
+  indexName: 'gsi_category',
+  partitionKey: { name: 'category', type: dynamodb.AttributeType.STRING }
 });
 ```
 
-### Node.js Route (services/api/routes/products.js)
+### Lambda Example (services/products/listByCategory.js)
 ```js
-const AWS = require('aws-sdk');
-const router = require('express').Router();
-const uuid = require('uuid').v4;
-const ddb = new AWS.DynamoDB.DocumentClient();
+import { DynamoDBClient, QueryCommand } from '@aws-sdk/client-dynamodb';
+import { unmarshall } from '@aws-sdk/util-dynamodb';
 
-router.post('/', async (req, res) => {
-  const { name, category, price } = req.body;
-  await ddb.put({ TableName: 'ProductTable', Item: { productId: uuid(), name, category, price } }).promise();
-  res.status(201).send('Product added');
-});
+const ddb = new DynamoDBClient({});
+const TABLE = process.env.PRODUCTS_TABLE;
+const GSI = 'gsi_category';
 
-router.get('/category/:name', async (req, res) => {
-  const category = req.params.name;
-  const result = await ddb.query({
-    TableName: 'ProductTable',
-    IndexName: 'CategoryIndex',
-    KeyConditionExpression: 'category = :cat',
-    ExpressionAttributeValues: {
-      ':cat': category
-    }
-  }).promise();
-  res.json(result.Items);
-});
+export const handler = async (event) => {
+  const name = event?.pathParameters?.name;
+  if (!name) return { statusCode: 400, body: 'Missing category name' };
+  const res = await ddb.send(new QueryCommand({
+    TableName: TABLE,
+    IndexName: GSI,
+    KeyConditionExpression: '#c = :v',
+    ExpressionAttributeNames: { '#c': 'category' },
+    ExpressionAttributeValues: { ':v': { S: name } }
+  }));
+  const items = (res.Items || []).map(unmarshall);
+  return { statusCode: 200, headers: { 'content-type': 'application/json' }, body: JSON.stringify(items) };
+};
 ```
 
 ---
 
-## Phase 3: User Management – Aurora (1h)
+## Phase 3: Cart Service (0.5h)
 
 ### Objective
-Create and manage relational data for users, carts, and orders using Amazon Aurora Serverless PostgreSQL.
+Allow users to manage a cart. For MVP, cart state is **in-memory** (per Lambda container).
 
 ### Tasks
-- Define Aurora Serverless cluster in CDK
-- Set up initial SQL schema for `users`, `orders`, and `carts` tables
-- Integrate Sequelize/TypeORM for interacting with Aurora
-- Use Secrets Manager for credential management
+- One Lambda handles `/cart` with:
+    - `GET` → view cart
+    - `POST` → add item (`{ id, qty }`)
+    - `DELETE` → remove item (`{ id }`)
+
+### Lambda Example (services/cart/handler.js)
+```js
+const carts = {}; // ephemeral, per warm container
+
+export const handler = async (event) => {
+  const user = event.requestContext?.http?.sourceIp || 'anon';
+  carts[user] ||= [];
+
+  const method = event.requestContext?.http?.method || 'GET';
+  if (method === 'GET') return json(200, { items: carts[user] });
+
+  const body = JSON.parse(event.body || '{}');
+  if (method === 'POST') {
+    if (!body.id || !body.qty) return text(400, 'id & qty required');
+    const idx = carts[user].findIndex(i => i.id === body.id);
+    if (idx >= 0) carts[user][idx].qty += body.qty;
+    else carts[user].push({ id: body.id, qty: body.qty });
+    return json(200, { items: carts[user] });
+  }
+  if (method === 'DELETE') {
+    if (!body.id) return text(400, 'id required');
+    const idx = carts[user].findIndex(i => i.id === body.id);
+    if (idx >= 0) carts[user].splice(idx, 1);
+    return json(200, { items: carts[user] });
+  }
+  return text(405, 'Method not allowed');
+};
+
+const json = (code, obj) => ({ statusCode: code, headers: { 'content-type': 'application/json' }, body: JSON.stringify(obj) });
+const text = (code, msg) => ({ statusCode: code, body: msg });
+```
+
+---
+
+## Phase 4: Checkout + SQS (1h)
+
+### Objective
+Process orders asynchronously with SQS + Lambda.
+
+### Tasks
+- Create SQS queue in CDK (+ optional DLQ).
+- `POST /checkout` Lambda → sends message to SQS.
+- **Worker** Lambda → consumes messages and logs/handles orders.
 
 ### CDK Code
-```ts
-import * as rds from 'aws-cdk-lib/aws-rds';
-import * as secretsmanager from 'aws-cdk-lib/aws-secretsmanager';
-
-const dbSecret = new secretsmanager.Secret(this, 'DBSecret');
-
-const cluster = new rds.ServerlessCluster(this, 'AuroraCluster', {
-  engine: rds.DatabaseClusterEngine.AURORA_POSTGRESQL,
-  vpc,
-  credentials: rds.Credentials.fromSecret(dbSecret),
-  defaultDatabaseName: 'CloudCartDB',
-});
-```
-
-### Node.js Connection Example
-```ts
-const { Sequelize } = require('sequelize');
-const sequelize = new Sequelize(process.env.DB_NAME, process.env.DB_USER, process.env.DB_PASS, {
-  host: process.env.DB_HOST,
-  dialect: 'postgres'
-});
-```
-
----
-
-## Phase 4: File Uploads – S3 (0.5h)
-
-### Objective
-Allow uploading product images to Amazon S3 securely using signed URLs.
-
-### Tasks
-- Create an S3 bucket using CDK
-- Configure IAM policies to allow signed URL usage
-- Implement signed URL generation endpoint
-
-### CDK Code
-```ts
-import * as s3 from 'aws-cdk-lib/aws-s3';
-
-const bucket = new s3.Bucket(this, 'ProductMediaBucket', {
-  versioned: true,
-  removalPolicy: cdk.RemovalPolicy.DESTROY,
-});
-```
-
-### Node.js Route
 ```js
-const s3 = new AWS.S3();
-router.get('/upload-url', async (req, res) => {
-  const { key } = req.query;
-  const url = await s3.getSignedUrlPromise('putObject', {
-    Bucket: process.env.BUCKET_NAME,
-    Key: key,
-    Expires: 60
-  });
-  res.json({ url });
-});
-```
-
----
-
-## Phase 5: Cart Service (0.5h)
-
-### Objective
-Allow users to manage their shopping carts, with backend logic supported by Aurora or DynamoDB.
-
-### Tasks
-- Use Aurora to store cart data with user and product references
-- Implement add, remove, and view routes for cart management
-
-### Node.js Route Example
-```js
-router.post('/cart/add', async (req, res) => {
-  const { userId, productId } = req.body;
-  await sequelize.query(`INSERT INTO carts (user_id, product_id) VALUES ($1, $2)`, {
-    bind: [userId, productId]
-  });
-  res.send('Added to cart');
-});
-```
-
----
-
-## Phase 6: Order Placement + SQS (1h)
-
-### Objective
-Asynchronously process orders using SQS and Lambda, improving scalability and decoupling services.
-
-### Tasks
-- Create SQS queue in CDK
-- Send order data to queue from Express
-- Create Lambda function that consumes messages
-
-### CDK Code
-```ts
 import * as sqs from 'aws-cdk-lib/aws-sqs';
+import { Duration } from 'aws-cdk-lib';
 
-const queue = new sqs.Queue(this, 'OrderQueue', {
-  visibilityTimeout: cdk.Duration.seconds(300)
+const dlq = new sqs.Queue(this, 'CheckoutDLQ');
+const checkoutQueue = new sqs.Queue(this, 'CheckoutQueue', {
+  visibilityTimeout: Duration.seconds(60),
+  deadLetterQueue: { queue: dlq, maxReceiveCount: 3 }
 });
 ```
 
-### Node.js Route
+### Checkout Lambda (services/orders/checkout.js)
 ```js
-const sqs = new AWS.SQS();
-router.post('/checkout', async (req, res) => {
-  const params = {
-    MessageBody: JSON.stringify(req.body),
-    QueueUrl: process.env.ORDER_QUEUE_URL
-  };
-  await sqs.sendMessage(params).promise();
-  res.send('Order received');
-});
+import { SQSClient, SendMessageCommand } from '@aws-sdk/client-sqs';
+const sqs = new SQSClient({});
+const QUEUE_URL = process.env.CHECKOUT_QUEUE_URL;
+
+export const handler = async (event) => {
+  const body = JSON.parse(event.body || '{}');
+  const id = body.id || String(Date.now());
+  await sqs.send(new SendMessageCommand({ QueueUrl: QUEUE_URL, MessageBody: JSON.stringify({ ...body, id }) }));
+  return { statusCode: 202, headers: { 'content-type': 'application/json' }, body: JSON.stringify({ queued: true, id }) };
+};
 ```
 
----
-
-## Phase 7: Notification System – SNS (0.5h)
-
-### Objective
-Send SMS or email notifications to users upon key events like order confirmations.
-
-### Tasks
-- Create SNS topic in CDK
-- Subscribe emails/SMS
-- Publish messages from Lambda
-
-### CDK Code
-```ts
-import * as sns from 'aws-cdk-lib/aws-sns';
-
-const topic = new sns.Topic(this, 'OrderTopic');
-```
-
-### Node.js Usage
+### Worker Lambda (services/orders/worker.js)
 ```js
-const sns = new AWS.SNS();
-await sns.publish({
-  TopicArn: process.env.TOPIC_ARN,
-  Message: 'Your order has been received!'
-}).promise();
+export const handler = async (event) => {
+  for (const rec of (event.Records || [])) {
+    const msg = JSON.parse(rec.body);
+    console.log('Order received:', msg);
+  }
+  return {};
+};
 ```
 
 ---
 
-## Phase 8: ECS App Service + ALB (1h)
+## Phase 5 (Optional): File Uploads – S3 (0.5h)
 
 ### Objective
-Deploy the API service on ECS using Docker, fronted by an Application Load Balancer.
+Support product image uploads using signed URLs (optional for MVP).
 
 ### Tasks
-- Dockerize Express app
-- Push image to ECR
-- Deploy to ECS Fargate via CDK
-- Attach ALB and route traffic
-
-### CDK Sample
-```ts
-import * as ecs from 'aws-cdk-lib/aws-ecs';
-import * as elbv2 from 'aws-cdk-lib/aws-elasticloadbalancingv2';
-
-const cluster = new ecs.Cluster(this, 'Cluster', { vpc });
-const taskDef = new ecs.FargateTaskDefinition(this, 'TaskDef');
-
-const container = taskDef.addContainer('AppContainer', {
-  image: ecs.ContainerImage.fromRegistry('your-repo/app-image'),
-  memoryLimitMiB: 512
-});
-
-const service = new ecs.FargateService(this, 'Service', {
-  cluster,
-  taskDefinition: taskDef
-});
-
-const lb = new elbv2.ApplicationLoadBalancer(this, 'LB', {
-  vpc,
-  internetFacing: true
-});
-```
+- Create an S3 bucket via CDK.
+- Add Lambda to generate `PutObject` signed URLs.
+- (Wire as `/uploads/sign` route if you have time.)
 
 ---
 
-## Phase 9: Global CDN Shopfront + Route 53 (1h)
+## Phase 6+ (Extensions)
 
-### Objective
-Host and serve the frontend React app globally using CloudFront and Route 53.
-
-### Tasks
-- Host frontend in S3
-- Set up CloudFront distribution
-- Point custom domain via Route 53
-
-### CDK Code
-```ts
-import * as cloudfront from 'aws-cdk-lib/aws-cloudfront';
-import * as s3deploy from 'aws-cdk-lib/aws-s3-deployment';
-
-const distribution = new cloudfront.CloudFrontWebDistribution(this, 'Dist', {
-  originConfigs: [
-    {
-      s3OriginSource: { s3BucketSource: bucket },
-      behaviors: [{ isDefaultBehavior: true }]
-    }
-  ]
-});
-```
-
----
-
-## Phase 10: Auth Layer – API Gateway + Lambda Authorizer (1h)
-
-### Objective
-Add security to APIs using API Gateway with Lambda-based JWT validation.
-
-### Tasks
-- Implement Lambda authorizer for JWT
-- Attach to API Gateway
-- Apply to secure endpoints
-
-### CDK Sample
-```ts
-import * as apigw from 'aws-cdk-lib/aws-apigateway';
-
-const authorizerFn = new lambda.Function(this, 'AuthorizerFunction', { /* config */ });
-const api = new apigw.RestApi(this, 'CloudCartAPI');
-
-const authorizer = new apigw.TokenAuthorizer(this, 'APIAuthorizer', {
-  handler: authorizerFn
-});
-
-api.root.addMethod('GET', new apigw.LambdaIntegration(apiHandler), {
-  authorizer
-});
-```
-
----
-
-## Phase 11: Secrets Management + Roles (0.5h)
-
-### Objective
-Securely manage secrets and control access via IAM.
-
-### Tasks
-- Store secrets in AWS Secrets Manager
-- Grant ECS and Lambda access via CDK
-
-### CDK Sample
-```ts
-import * as secretsmanager from 'aws-cdk-lib/aws-secretsmanager';
-
-const secret = new secretsmanager.Secret(this, 'AppSecret');
-secret.grantRead(yourServiceRole);
-```
-
----
-
-## Phase 12: Monitoring, Alarms & CI/CD (1h)
-
-### Objective
-Add observability and automation for deployment.
-
-### Tasks
-- Create CloudWatch metrics and alarms
-- Automate deploys with GitHub Actions
-
-### CDK Example
-```ts
-import * as cloudwatch from 'aws-cdk-lib/aws-cloudwatch';
-
-new cloudwatch.Alarm(this, 'HighLatencyAlarm', {
-  metric: alb.metricTargetResponseTime(),
-  threshold: 1,
-  evaluationPeriods: 3
-});
-```
-
-### GitHub Actions Workflow
-```yaml
-name: Deploy
-on:
-  push:
-    branches: [main]
-jobs:
-  deploy:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v2
-      - run: npm install -g aws-cdk
-      - run: npm ci
-      - run: cdk deploy --require-approval never
-```
-
----
+- **Notifications (SNS)** — order confirmations via email/SMS.
+- **Auth (JWT + Lambda Authorizer)** — protect `/checkout` and future `/orders` routes.
+- **Aurora PostgreSQL + RDS Proxy** — relational data (users, persistent carts, orders).
+- **Frontend Hosting** — React via S3 + CloudFront + Route 53.
+- **Monitoring & CI/CD** — CloudWatch alarms + GitHub Actions/CDK Pipelines.

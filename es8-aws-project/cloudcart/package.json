@@ -1,0 +1,1 @@
+{"name":"cloudcart-mvp-js","private":true,"type":"module","dependencies":{"@aws-sdk/client-dynamodb":"^3.882.0"}}

@@ -1,188 +1,146 @@
-# CloudCart: Scalable E-commerce Backend (Node.js + AWS)
+# CloudCart: Serverless E-commerce Backend (Node.js + AWS)
 
-CloudCart is a real-world, cloud-native e-commerce backend project built using Node.js and AWS services.
-It demonstrates how to build a scalable, event-driven backend architecture leveraging key AWS services like EC2, ECS, S3, API Gateway, DynamoDB, Aurora, Lambda, and more.
+CloudCart is a minimal, cloud-native e-commerce backend built using Node.js and AWS services.  
+It demonstrates how to build a **serverless, event-driven backend architecture** leveraging **AWS Lambda, API Gateway, DynamoDB, and SQS**.
+
+---
 
 ## 🔧 Project Features
 
-- Product Catalog via DynamoDB
-- User & Order management via Aurora PostgreSQL (with RDS Proxy)
-- File Uploads via S3 Signed URLs
-- Cart service (Aurora)
-- Order placement via SQS, background processing with Lambda
-- Notifications via SNS (Email/SMS)
-- API Gateway + Lambda Authorizer for Auth
-- React/Static frontend hosted on S3 + CloudFront
-- Secrets management via Secrets Manager
-- Infrastructure defined with AWS CDK
-- CI/CD (optional) via GitHub Actions
+- **Product Catalog via DynamoDB**
+  - `GET /products`
+  - `GET /products/:id`
+  - `GET /categories/:name` (via GSI)
+- **Cart Service (in-memory demo)**
+  - `GET /cart`
+  - `POST /cart`
+  - `DELETE /cart`
+- **Order placement with SQS**
+  - `POST /checkout` → enqueues order
+  - **Worker Lambda** consumes queue & logs orders
+- **Infrastructure defined with AWS CDK (JavaScript)**
+- **Seeder script** for sample products
+
+---
 
 ## 📦 Prerequisites
 
 - AWS CLI & credentials configured
 - AWS CDK installed (`npm install -g aws-cdk`)
 - Node.js >= 22.x
-- Docker (for ECS packaging)
-- PostgreSQL client (optional for Aurora testing)
 
-## 📁 Project Phases
+---
 
-This project is implemented in 12 phases. Each phase builds part of the system using Node.js and AWS CDK.
+## ⚡ Quick Start
+
+```bash
+# 1. Install dependencies
+cd cloudcart/infra && npm i && cd ../services && npm i && cd ..
+
+# 2. Deploy infra (API Gateway + DynamoDB + SQS + Lambdas)
+cd infra
+npm run deploy
+
+# 3. Record outputs
+# - HttpApiUrl
+# - ProductsTable
+
+# 4. Seed sample products
+cd ../scripts
+PRODUCTS_TABLE=<ProductsTableName from outputs> node seed-products.js
+
+# 5. Test API
+API=<HttpApiUrl from outputs>
+
+curl $API/products
+curl $API/products/1
+curl $API/categories/electronics
+
+# Cart operations
+curl -X POST $API/cart -H 'content-type: application/json' -d '{"id":"1","qty":2}'
+curl $API/cart
+curl -X DELETE $API/cart -H 'content-type: application/json' -d '{"id":"1"}'
+
+# Checkout
+curl -X POST $API/checkout -H 'content-type: application/json' -d '{"items":[{"id":"1","qty":2}],"total":199.99}'
+```
+
+---
 
 ## 🌐 Architecture Overview
 
 ```
-[React/Static Shopfront] ← CloudFront ← S3  
-                      │  
-             Route53 + SSL (ACM)  
-                      │  
-     API Gateway (HTTP API) + Lambda Authorizer  
-          │  
- ┌────────┴─────────┐  
- │   Lambda (APIs)  │  ← VPC + RDS Proxy for Aurora  
- └───┬───────┬──────┘  
-   DynamoDB  │  
-      ▲      │  
-      │    Aurora PostgreSQL  
-      │           ▲  
-  S3 (media)      │  
-      ▲           │  
-  Signed URL  Secrets Manager  
-      │           │  
-   Lambda ◄── SQS (checkout) ──► Lambda worker ──► SNS (email/SMS)
+[React/Static Shopfront] (optional)
+        │
+   API Gateway (HTTP API)
+        │
+ ┌──────┴────────┐
+ │   Lambdas     │
+ └─┬─────┬───────┘
+   │     │
+   │     └─> DynamoDB (Products table + GSI: category)
+   │
+   └─> /cart (in-memory)
+   │
+   └─> /checkout → SQS Queue → Worker Lambda
 ```
 
 ---
 
-## 📁 Suggested Monorepo Structure
+## 📁 Monorepo Structure
 
 ```
 cloudcart/
-├── infra/                     # AWS CDK (TypeScript)
-│   ├── lib/                   # Stack definitions
-│   │   ├── network.ts
-│   │   ├── db.ts
-│   │   ├── dynamo.ts
-│   │   ├── api.ts
-│   │   ├── lambdas.ts
-│   │   └── notifications.ts
-│   └── bin/infra.ts           # CDK App entrypoint
-├── services/
-│   ├── functions/             # Lambda handlers
-│   │   ├── products/
-│   │   ├── users/
-│   │   ├── orders/
-│   │   ├── cart/
-│   │   ├── uploads/
-│   │   ├── auth/
-│   │   └── worker/
-│   └── shared/                # Shared utils/models
-├── scripts/                   # Seeder, migrations
-└── frontend/                  # Optional React frontend
+├── infra/              # AWS CDK (JavaScript)
+│   ├── bin/            # CDK app entry
+│   └── lib/            # Stack definitions
+├── services/           # Lambda handlers
+│   ├── products/       # Products API
+│   ├── cart/           # Cart API
+│   └── orders/         # Checkout + Worker
+└── scripts/            # Seeder scripts
 ```
 
 ---
 
-## 🪜 Step-by-Step Implementation Plan (10–12 hours)
+## 🪜 Step-by-Step Plan
 
-### 1. Bootstrap CDK and API Service (0.5h)
+1. **Infra**: deploy DynamoDB + SQS + API Gateway + Lambdas
+2. **Products API**: implement `/products`, `/products/{id}`, `/categories/{name}`
+3. **Cart API**: implement `/cart` with in-memory logic
+4. **Checkout**: implement `/checkout` + worker Lambda for queue consumption
+5. **(Optional)**: add uploads + frontend
 
-- Init CDK app: `cdk init app --language=typescript`
-- Create VPC, Security Groups, Subnets (reuse in future stacks)
+---
 
-### 2. Product Catalog API – DynamoDB (1h)
+## 🚀 Next Steps (Beyond the MVP)
 
-- Table: `Products` with GSI (Global Secondary Index) on `category`
-- REST API: `/products`, `/products/:id`, `/categories/:name`
-- IAM roles for API to access DynamoDB
+Once you have the MVP running, you can evolve CloudCart into a **full production-ready system** by adding:
 
-✅ AWS: **DynamoDB, IAM, CDK**
+- **Aurora PostgreSQL + RDS Proxy**  
+  For user management, persistent carts, and relational order data.
 
-### 3. User Management – SQL via Aurora (1h)
+- **Authentication & Authorization**  
+  Use API Gateway + Lambda Authorizer or Cognito JWTs to protect checkout and orders.
 
-- Deploy **Aurora Serverless v2** (PostgreSQL)
-- Create `users`, `orders`, `carts` tables
-- REST endpoints: `/users/register`, `/login`, `/orders`
+- **S3 Signed Uploads**  
+  Add `/uploads/sign` for product image uploads, store in S3.
 
-✅ AWS: **Aurora, VPC, Secrets Manager, CDK**
+- **Notifications (SNS / SES / SMS)**  
+  Worker Lambda can publish order updates to customers.
 
-### 4. File Uploads – Product Images via S3 (0.5h)
+- **Monitoring & Alarms**  
+  Add CloudWatch metrics and alarms for API latency, queue backlog, and error rates.
 
-- Upload product images using signed URLs
-- IAM: Allow only `PutObject` per session token
-- Lifecycle rules for archiving or deleting stale media
+- **Frontend Hosting**  
+  Deploy a React frontend to S3 + CloudFront + Route 53 for global delivery.
 
-✅ AWS: **S3, IAM, CDK**
+- **CI/CD**  
+  Automate deployments using GitHub Actions + CDK Pipelines.
 
-### 5. Cart Service (0.5h)
+---
 
-- Use Aurora `carts` table or DynamoDB (choice)
-- Endpoints: `/cart/add`, `/cart/remove`, `/cart/view`
-- Associate cart by session token or user ID
+👉 This way you can start small in a few hours, and grow it step-by-step into a **scalable, real-world e-commerce backend**.
 
-✅ AWS: **Aurora/DynamoDB**
-
-### 6. Order Placement + SQS Queue (1h)
-
-- Place order: `/checkout` writes to SQS
-- Background Lambda listens and:
-    - Verifies stock
-    - Writes to `orders` table
-    - Publishes to SNS
-
-✅ AWS: **SQS, Lambda, Aurora, SNS**
-
-### 7. Notification System – Email/SMS via SNS (0.5h)
-
-- Subscribe customer email/SMS to topic
-- On order update or shipping event, publish to SNS
-- Optional: Add multiple topics for different regions
-
-✅ AWS: **SNS, IAM, CDK**
-
-### 8. ECS App Service + Load Balancer (1h)
-
-- Dockerize Node.js service
-- Deploy to ECS Fargate with AutoScaling
-- Attach Application Load Balancer (ALB)
-- Configure listener rules for routing `/api/*`
-
-✅ AWS: **ECS, ALB, CDK, ECR**
-
-### 9. Global CDN Shopfront + Route 53 (1h)
-
-- Host React frontend in S3 bucket
-- Serve via CloudFront
-- Map domain via Route 53, add TLS with ACM
-
-✅ AWS: **S3, CloudFront, Route 53, ACM**
-
-### 10. Auth Layer – API Gateway + Lambda Authorizer (1h)
-
-- Secure `/orders`, `/checkout`, etc.
-- Use Lambda-based JWT validator
-- Attach to API Gateway routes
-- Set up throttling, usage plans
-
-✅ AWS: **API Gateway, Lambda, IAM**
-
-### 11. Secrets Management + Roles (0.5h)
-
-- Store DB credentials, API keys in **Secrets Manager**
-- Grant ECS & Lambda secure, read-only access
-- Audit using CloudTrail
-
-✅ AWS: **Secrets Manager, IAM, CloudTrail**
-
-### 12. Monitoring, Alarms & CI/CD (Optional, 1h)
-
-- Add CloudWatch logging
-- Set up alarms on:
-    - High latency (ALB)
-    - Queue backlog (SQS)
-    - Order failure rate
-- Add GitHub Actions for CDK deployments
-
-✅ AWS: **CloudWatch, CDK Pipelines (optional)**
 
 > For hints with code snippets and CDK examples, see the [hints](./hints.md)

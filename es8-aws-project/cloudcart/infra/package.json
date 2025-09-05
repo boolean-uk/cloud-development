@@ -1,0 +1,18 @@
+{
+  "name": "cloudcart-infra-mvp",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "synth": "node bin/infra.js && cdk synth",
+    "deploy": "node bin/infra.js && cdk deploy",
+    "destroy": "cdk destroy"
+  },
+  "devDependencies": {
+    "aws-cdk-lib": "^2.149.0",
+    "constructs": "^10.3.0",
+    "esbuild": "^0.23.1"
+  },
+  "dependencies": {
+    "source-map-support": "^0.5.21"
+  }
+}
