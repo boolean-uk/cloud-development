@@ -107,6 +107,3 @@ kubectl port-forward svc/webserver 8080:80
 -   **Cleanup stuck**: usually `kubectl delete all --all` is enough.
 
 ------------------------------------------------------------------------
-
-✅ After completing this lab, you'll know how to: - Create a
-deployment - Expose it as a service - Scale replicas - Perform cleanup
