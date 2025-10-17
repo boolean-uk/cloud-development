@@ -1,0 +1,5 @@
+CREATE TABLE Media (
+    Id INT PRIMARY KEY IDENTITY,
+    Title NVARCHAR(100),
+    Url NVARCHAR(255)
+);

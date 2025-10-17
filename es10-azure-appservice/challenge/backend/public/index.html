@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html>
+<head><title>MediaVault Upload</title></head>
+<body>
+    <h1>Upload Image</h1>
+    <form action="/upload" method="post" enctype="multipart/form-data">
+        Title: <input type="text" name="title"><br><br>
+        File: <input type="file" name="file"><br><br>
+        <button type="submit">Upload</button>
+    </form>
+    <hr>
+    <h2>Uploaded Media</h2>
+    <ul id="media-list"></ul>
+
+    <script>
+        fetch('/media').then(res => res.json()).then(data => {
+            const list = document.getElementById('media-list');
+            data.forEach(m => {
+                const li = document.createElement('li');
+                li.innerHTML = `<b>${m.Title}</b><br><img src="${m.Url}" width="200"><br><br>`;
+                list.appendChild(li);
+            });
+        });
+    </script>
+</body>
+</html>

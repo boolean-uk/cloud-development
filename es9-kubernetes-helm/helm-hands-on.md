@@ -185,13 +185,13 @@ my-release-service   NodePort   10.96.45.23     <none>        80:30080/TCP   1m
 ### 3. Access the page
 - If using **minikube**:
   ```bash
-  minikube service my-release-service
+  minikube service my-release-my-webapp
   ```
   This will open the page in your browser.
 
 - Or manually with NodePort:
   ```bash
-  kubectl get svc my-release-service
+  kubectl get svc my-release-my-webapp
   ```
   Then open in your browser:
   ```
