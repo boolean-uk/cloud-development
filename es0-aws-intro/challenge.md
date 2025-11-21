@@ -42,7 +42,7 @@ Get comfortable with the AWS UI and locate core services.
 
 ### Objective
 
-Deploy an EC2 instance with Amazon Linux 2 in `eu-west-1`.
+Deploy an EC2 instance with Amazon Linux 2023 (free tier eligible) in `eu-west-1`.
 
 ### Steps
 
