@@ -29,7 +29,7 @@ Get comfortable with the AWS UI and locate core services.
     -   EC2
     -   S3
 
-4.  Add them to Favorites.\
+4.  Add them to Favorites.
 
 5.  Browse:
 
