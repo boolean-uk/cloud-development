@@ -1,0 +1,16 @@
+{
+  "name": "node-s3-app",
+  "version": "1.0.0",
+  "main": "app.js",
+  "type": "module",
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "dependencies": {
+    "@aws-sdk/client-s3": "^3.609.0",
+    "@aws-sdk/s3-request-presigner": "^3.609.0",
+    "cors": "^2.8.5",
+    "express": "^4.19.0",
+    "multer": "^1.4.5"
+  }
+}

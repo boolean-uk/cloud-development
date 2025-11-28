@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>S3 File Manager</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<h1>S3 File Manager</h1>
+
+<section>
+  <h2>Upload a File</h2>
+  <input type="file" id="fileInput">
+  <button onclick="uploadFile()">Upload</button>
+</section>
+
+<section>
+  <h2>Files on S3</h2>
+  <button onclick="loadFiles()">Refresh List</button>
+  <ul id="fileList"></ul>
+</section>
+
+<script src="script.js"></script>
+
+</body>
+</html>
