@@ -200,7 +200,7 @@ Paste:
     "@aws-sdk/s3-request-presigner": "^3.609.0",
     "cors": "^2.8.5",
     "express": "^4.19.0",
-    "multer": "^1.4.5"
+    "multer": "^2.0.2"
   }
 }
 ```
