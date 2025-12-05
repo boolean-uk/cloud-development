@@ -180,28 +180,30 @@ nano server.py
 Paste this:
 
 ```python
-from flask import Flask, request, jsonify
-from flask_sockets import Sockets
+from flask import Flask, request, jsonify, Response
 from flask_cors import CORS
-import gevent
+import time
 import os
 import uuid
 import boto3
+import threading
 
 app = Flask(__name__)
 CORS(app)
-sockets = Sockets(app)
 
 s3 = boto3.client("s3")
 UPLOAD_BUCKET = "minichat-uploads-YOURGROUP"
 
 HISTORY_FILE = "/chatdata/history.txt"
-clients = []
+
+subscribers = []  # list of queues for SSE clients
+
 
 def save_message(msg):
     os.makedirs(os.path.dirname(HISTORY_FILE), exist_ok=True)
     with open(HISTORY_FILE, "a") as f:
-        f.write(msg + "\\n")
+        f.write(msg + "\n")
+
 
 def load_history():
     if not os.path.exists(HISTORY_FILE):
@@ -209,31 +211,44 @@ def load_history():
     with open(HISTORY_FILE, "r") as f:
         return f.readlines()
 
+
 def broadcast(msg):
     dead = []
-    for ws in clients:
+    for q in subscribers:
         try:
-            ws.send(msg)
+            q.put(msg)
         except:
-            dead.append(ws)
-    for ws in dead:
-        clients.remove(ws)
+            dead.append(q)
+    for q in dead:
+        subscribers.remove(q)
 
-@sockets.route("/chat")
-def chat_socket(ws):
-    clients.append(ws)
-    for line in load_history():
-        ws.send(line.strip())
 
-    try:
-        while not ws.closed:
-            msg = ws.receive()
-            if msg is None:
-                break
-            save_message(msg)
-            broadcast(msg)
-    finally:
-        clients.remove(ws)
+@app.route("/send", methods=["POST"])
+def send_message():
+    data = request.json
+    msg = data.get("msg")
+    save_message(msg)
+    broadcast(msg)
+    return jsonify({"status": "ok"})
+
+
+@app.route("/stream")
+def stream():
+    def event_stream(queue):
+        # Send history on connect
+        for line in load_history():
+            yield f"data: {line.strip()}\n\n"
+
+        # Then listen for new messages
+        while True:
+            msg = queue.get()
+            yield f"data: {msg}\n\n"
+
+    import queue
+    q = queue.Queue()
+    subscribers.append(q)
+    return Response(event_stream(q), mimetype="text/event-stream")
+
 
 @app.route("/upload", methods=["POST"])
 def upload_file():
@@ -259,15 +274,14 @@ def upload_file():
 
     return jsonify({"url": url})
 
+
 @app.route("/")
 def index():
-    return "MiniChat backend running"
+    return "MiniChat backend running (SSE mode)"
 
 if __name__ == "__main__":
-    from gevent import pywsgi
-    from geventwebsocket.handler import WebSocketHandler
-    server = pywsgi.WSGIServer(("", 8000), app, handler_class=WebSocketHandler)
-    server.serve_forever()
+    print("Running MiniChat SSE server on port 8000...")
+    app.run(host="0.0.0.0", port=8000, threaded=True)
 ```
 
 Change `UPLOAD_BUCKET`.
@@ -301,50 +315,74 @@ Create file locally:
 <!DOCTYPE html>
 <html>
 <head>
-  <meta charset="UTF-8">
-  <title>MiniChat</title>
+    <meta charset="UTF-8">
+    <title>MiniChat</title>
 </head>
 <body>
-  <h1>MiniChat</h1>
+<h1>MiniChat</h1>
 
-  <div id="messages" style="height:250px; overflow-y:scroll; border:1px solid gray;"></div>
+<div id="messages" style="height:250px; overflow-y:scroll; border:1px solid gray;"></div>
 
-  <input id="msg" placeholder="Message...">
-  <button onclick="sendMessage()">Send</button>
+<input id="msg" placeholder="Message...">
+<button onclick="sendMessage()">Send</button>
 
-  <br><br>
-  <input type="file" id="fileInput">
-  <button onclick="uploadFile()">Upload File</button>
+<br><br>
+<input type="file" id="fileInput">
+<button onclick="uploadFile()">Upload File</button>
 
-  <script>
+<script>
     const EC2 = "YOUR-EC2-IP";
-    const ws = new WebSocket("ws://" + EC2 + ":8000/chat");
 
-    ws.onmessage = event => {
-      const box = document.getElementById("messages");
+    const msgBox = document.getElementById("messages");
+
+    function log(msg) {
+      console.log(msg);
+    }
+
+    // ---- SSE CONNECTION ----
+    const evtSource = new EventSource("http://" + EC2 + ":8000/stream");
+
+    evtSource.onmessage = function(event) {
       const m = event.data;
+
       if (m.startsWith("[FILE]")) {
         const [_, rest] = m.split("[FILE] ");
         const [name, url] = rest.split(" → ");
-        box.innerHTML += `<div><b>File:</b> <a href="${url}">${name}</a></div>`;
+        msgBox.innerHTML += `<div><b>File:</b> <a href="${url}" target="_blank">${name}</a></div>`;
       } else {
-        box.innerHTML += `<div>${m}</div>`;
+        msgBox.innerHTML += `<div>${m}</div>`;
       }
-      box.scrollTop = box.scrollHeight;
+
+      msgBox.scrollTop = msgBox.scrollHeight;
     };
 
+    evtSource.onerror = function(err) {
+      console.error("SSE error:", err);
+    };
+
+    // ---- SEND MESSAGE ----
     function sendMessage() {
-      ws.send(document.getElementById("msg").value);
+      const text = document.getElementById("msg").value;
+      fetch("http://" + EC2 + ":8000/send", {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({msg: text})
+      });
       document.getElementById("msg").value = "";
     }
 
+    // ---- FILE UPLOAD ----
     function uploadFile() {
       const file = document.getElementById("fileInput").files[0];
       const data = new FormData();
       data.append("file", file);
-      fetch("http://" + EC2 + ":8000/upload", { method:"POST", body:data });
+
+      fetch("http://" + EC2 + ":8000/upload", {
+        method: "POST",
+        body: data
+      });
     }
-  </script>
+</script>
 </body>
 </html>
 ```
