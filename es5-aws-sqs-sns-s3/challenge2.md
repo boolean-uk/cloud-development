@@ -1,6 +1,6 @@
 # 🧩 SNS → SQS → Lambda Batch Concatenation → S3
 
-This is a **simple, student-friendly AWS challenge** that builds an event-driven workflow using:
+This is a **simple challenge**, that builds an event-driven workflow using:
 
 - 📣 **SNS** — publish chunk events  
 - 📬 **SQS** — buffer + batch delivery  
