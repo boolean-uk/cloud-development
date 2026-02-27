@@ -58,7 +58,7 @@ By completing this challenge, you will:
 
 ```
 ┌─────────────────────────────────────────────────────────────────────┐
-│                    IoT Sensor Data Pipeline                          │
+│                    IoT Sensor Data Pipeline                         │
 └─────────────────────────────────────────────────────────────────────┘
 
   Temperature Sensors
