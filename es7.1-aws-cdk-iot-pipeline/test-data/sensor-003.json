@@ -1,0 +1,7 @@
+{
+  "sensorId": "sensor-003",
+  "timestamp": "2026-02-27T10:22:15Z",
+  "temperature": 25.3,
+  "location": "warehouse-b",
+  "unit": "celsius"
+}

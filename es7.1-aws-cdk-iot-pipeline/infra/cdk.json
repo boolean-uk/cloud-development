@@ -1,0 +1,4 @@
+{
+  "app": "node bin/iot-pipeline.js",
+  "@aws-cdk/core:newStyleStackSynthesis": true
+}

@@ -1,0 +1,35 @@
+# Dependencies
+node_modules/
+package-lock.json
+
+# CDK
+.cdk.staging/
+cdk.out/
+*.js.map
+outputs.json
+
+# Lambda build artifacts
+*.zip
+
+# Logs
+*.log
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Environment
+.env
+.env.local
+
+# Temporary files
+response.json
+temp/
+tmp/
