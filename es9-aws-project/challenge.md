@@ -165,39 +165,76 @@ node seed-products.js $PRODUCTS_TABLE
 
 ### Current Architecture (After All Sessions)
 
+
+```mermaid
+flowchart TB
+
+%% Entry
+   Internet["Internet"]
+
+%% Main architecture
+   subgraph Edge["Entry Layer"]
+      APIGateway["API Gateway<br/>HTTP API"]
+      ALB["Application Load Balancer"]
+   end
+
+   subgraph Compute["Compute Layer"]
+      Lambda["Lambda Functions"]
+      ECS["ECS Fargate<br/>Admin Dashboard"]
+   end
+
+   subgraph Data["Data Layer"]
+      DynamoDB[("DynamoDB<br/>Products + Orders")]
+      S3[("S3<br/>Images")]
+      SQS["SQS + DLQ"]
+   end
+
+   subgraph Observability["Monitoring"]
+      CloudWatch["CloudWatch<br/>Logs • Metrics • Alarms"]
+      SNS["SNS Alerts"]
+   end
+
+%% Main flow
+   Internet --> APIGateway
+   Internet --> ALB
+
+   APIGateway --> Lambda
+   ALB --> ECS
+
+   Lambda --> DynamoDB
+   Lambda --> S3
+   Lambda --> SQS
+
+   ECS --> DynamoDB
+   SQS --> Lambda
+
+%% Monitoring flow
+   CloudWatch --> SNS
+
+%% Dotted monitoring relationships
+   Lambda -.-> CloudWatch
+   ECS -.-> CloudWatch
+   DynamoDB -.-> CloudWatch
+   S3 -.-> CloudWatch
+   SQS -.-> CloudWatch
+
+%% Styles
+   style Internet fill:#f1f8ff,stroke:#1e88e5,stroke-width:2px,color:#0d47a1
+
+   style APIGateway fill:#fff4e5,stroke:#fb8c00,stroke-width:2px,color:#222
+   style ALB fill:#fff4e5,stroke:#fb8c00,stroke-width:2px,color:#222
+
+   style Lambda fill:#fff8e1,stroke:#f57c00,stroke-width:2px,color:#222
+   style ECS fill:#fff8e1,stroke:#f57c00,stroke-width:2px,color:#222
+
+   style DynamoDB fill:#eef2ff,stroke:#3949ab,stroke-width:2px,color:#1a237e
+   style S3 fill:#edf7ed,stroke:#2e7d32,stroke-width:2px,color:#1b5e20
+   style SQS fill:#fffde7,stroke:#f9a825,stroke-width:2px,color:#5f4200
+
+   style CloudWatch fill:#f3e5f5,stroke:#8e24aa,stroke-width:2px,color:#4a148c
+   style SNS fill:#fde4ec,stroke:#c2185b,stroke-width:2px,color:#880e4f
 ```
-┌─────────────────────────────────────────────────────────────┐
-│                         Internet                             │
-└───────────────┬────────────────────────┬────────────────────┘
-                │                        │
-        ┌───────▼────────┐      ┌───────▼──────────┐
-        │  API Gateway   │      │  Load Balancer   │
-        │  (HTTP API)    │      │     (ALB)        │
-        └───────┬────────┘      └───────┬──────────┘
-                │                       │
-        ┌───────▼────────┐      ┌───────▼──────────┐
-        │                │      │   ECS Fargate    │
-        │    Lambda      │      │ Admin Dashboard  │
-        │   Functions    │      │                  │
-        │                │      └───────┬──────────┘
-        └───┬───┬───┬───┘              │
-            │   │   │          ┌───────▼──────────┐
-┌───────────▼───┼───┼──────────▼────────┐         │
-│  DynamoDB     │   │         S3        │         │
-│  (Products +  │   │      (Images)     │         │
-│   Orders)     │   │                   │         │
-└───────────────┘   │   ┌───────────────▼─────────▼─┐
-                    │   │      CloudWatch            │
-            ┌───────▼───▼────┐  (Logs + Metrics +   │
-            │      SQS       │   Dashboard + Alarms) │
-            │  (+ DLQ)       │                        │
-            └────────────────┘  └────────────┬────────┘
-                                            │
-                                    ┌───────▼───────┐
-                                    │      SNS      │
-                                    │  (Alerts)     │
-                                    └───────────────┘
-```
+
 
 ---
 
