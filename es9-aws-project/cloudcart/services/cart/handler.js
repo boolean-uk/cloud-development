@@ -1,4 +1,7 @@
+import { CloudWatchClient, PutMetricDataCommand } from '@aws-sdk/client-cloudwatch';
+
 const carts = {}; // in-memory (per warm container)
+const cloudwatch = new CloudWatchClient({});
 
 export const handler = async (event) => {
   const user = event.requestContext?.http?.sourceIp || 'anon';
@@ -20,6 +23,18 @@ export const handler = async (event) => {
     } else {
       carts[user].push({id: body.id, qty: body.qty});
     }
+
+    // Emit custom metric for cart additions
+    await cloudwatch.send(new PutMetricDataCommand({
+      Namespace: 'CloudCart',
+      MetricData: [{
+        MetricName: 'CartItemAdded',
+        Value: 1,
+        Unit: 'Count',
+        Timestamp: new Date()
+      }]
+    }));
+
     return json(200, {items: carts[user]});
   }
   if (method === 'DELETE') {
@@ -30,6 +45,18 @@ export const handler = async (event) => {
     if (idx >= 0) {
       carts[user].splice(idx, 1);
     }
+
+    // Emit custom metric for cart removals
+    await cloudwatch.send(new PutMetricDataCommand({
+      Namespace: 'CloudCart',
+      MetricData: [{
+        MetricName: 'CartItemRemoved',
+        Value: 1,
+        Unit: 'Count',
+        Timestamp: new Date()
+      }]
+    }));
+
     return json(200, {items: carts[user]});
   }
   return text(405, 'Method not allowed');

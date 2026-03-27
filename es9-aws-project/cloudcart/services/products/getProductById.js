@@ -14,9 +14,10 @@ export const handler = async (event) => {
   if (!res.Item) {
     return {statusCode: 404, body: 'Not found'};
   }
+  const product = unmarshall(res.Item);
   return {
     statusCode: 200,
     headers: {'content-type': 'application/json'},
-    body: JSON.stringify(unmarshall(res.Item))
+    body: JSON.stringify(product)
   };
 };

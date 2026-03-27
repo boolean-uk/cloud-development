@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title><%= title %></title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif; background: #f5f5f5; }
+    .header { background: #1a73e8; color: white; padding: 1.5rem 2rem; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+    .header h1 { font-size: 1.8rem; font-weight: 600; }
+    .nav { background: white; border-bottom: 1px solid #e0e0e0; padding: 0 2rem; }
+    .nav a { display: inline-block; padding: 1rem 1.5rem; color: #5f6368; text-decoration: none; border-bottom: 3px solid transparent; }
+    .nav a:hover, .nav a.active { color: #1a73e8; border-bottom-color: #1a73e8; }
+    .container { max-width: 1200px; margin: 2rem auto; padding: 0 2rem; }
+    .table-container { background: white; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); overflow: hidden; }
+    table { width: 100%; border-collapse: collapse; }
+    th, td { padding: 1rem; text-align: left; border-bottom: 1px solid #e0e0e0; }
+    th { background: #f8f9fa; color: #202124; font-weight: 600; }
+    tr:hover { background: #f8f9fa; }
+    .badge { display: inline-block; padding: 0.3rem 0.8rem; border-radius: 12px; font-size: 0.85rem; font-weight: 500; }
+    .badge-electronics { background: #e3f2fd; color: #1976d2; }
+    .badge-grocery { background: #e8f5e9; color: #388e3c; }
+    .price { font-weight: 600; color: #1a73e8; }
+    .empty { text-align: center; padding: 3rem; color: #5f6368; }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>CloudCart Admin Dashboard</h1>
+  </div>
+  <div class="nav">
+    <a href="/">Home</a>
+    <a href="/products" class="active">Products</a>
+    <a href="/orders">Orders</a>
+    <a href="/metrics">Metrics</a>
+  </div>
+  <div class="container">
+    <h2 style="margin-bottom: 1.5rem; color: #202124;">Products (<%= products.length %>)</h2>
+    <div class="table-container">
+      <% if (products.length === 0) { %>
+        <div class="empty">No products found</div>
+      <% } else { %>
+        <table>
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>Name</th>
+              <th>Category</th>
+              <th>Price</th>
+              <th>Image</th>
+            </tr>
+          </thead>
+          <tbody>
+            <% products.forEach(product => { %>
+              <tr>
+                <td><%= product.id %></td>
+                <td><%= product.name %></td>
+                <td>
+                  <span class="badge badge-<%= product.category %>">
+                    <%= product.category %>
+                  </span>
+                </td>
+                <td class="price">$<%= product.price.toFixed(2) %></td>
+                <td>
+                  <% if (product.imageUrl) { %>
+                    <a href="<%= product.imageUrl %>" target="_blank">View</a>
+                  <% } else { %>
+                    -
+                  <% } %>
+                </td>
+              </tr>
+            <% }) %>
+          </tbody>
+        </table>
+      <% } %>
+    </div>
+  </div>
+</body>
+</html>

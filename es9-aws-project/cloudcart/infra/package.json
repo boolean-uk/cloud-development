@@ -3,11 +3,12 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "synth": "node bin/infra.js && cdk synth",
-    "deploy": "node bin/infra.js && cdk deploy",
-    "destroy": "cdk destroy"
+    "synth": "node bin/infra.js && npx cdk synth",
+    "deploy": "node bin/infra.js && npx cdk deploy",
+    "destroy": "npx cdk destroy"
   },
   "devDependencies": {
+    "aws-cdk": "^2.149.0",
     "aws-cdk-lib": "^2.149.0",
     "constructs": "^10.3.0",
     "esbuild": "^0.23.1"
